@@ -1,52 +1,66 @@
-name: Auto-close conflicted Dependabot PRs
+name: Dependabot Auto-rebase
 
 on:
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '0 */6 * * *'
   workflow_dispatch:
 
 permissions:
-  pull-requests: write
   contents: read
+  pull-requests: write
+  issues: write
 
 jobs:
-  auto-close:
+  rebase-stale-prs:
     runs-on: ubuntu-latest
     steps:
-      - name: Close conflicted Dependabot PRs
-        uses: actions/github-script@v7
+      - name: Trigger rebase for conflicted/behind Dependabot PRs
+        uses: actions/github-script@v8
         with:
           script: |
+            const { owner, repo } = context.repo;
             const { data: prs } = await github.rest.pulls.list({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
+              owner,
+              repo,
               state: 'open',
+              per_page: 100
             });
-            
+
             for (const pr of prs) {
-              if (pr.user.login !== 'dependabot[bot]') continue;
-              
-              const { data: review } = await github.rest.pulls.get({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: pr.number,
+              if (pr.user?.login !== 'dependabot[bot]') continue;
+
+              const { data: details } = await github.rest.pulls.get({
+                owner,
+                repo,
+                pull_number: pr.number
               });
-              
-              if (review.mergeable === false) {
-                await github.rest.pulls.update({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  pull_number: pr.number,
-                  state: 'closed',
-                });
-                
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: pr.number,
-                  body: 'This PR has been automatically closed due to merge conflicts. Dependabot will create a new PR with updated changes.',
-                });
-                
-                console.log(`Closed PR #${pr.number} due to merge conflict`);
-              }
+
+              const state = details.mergeable_state;
+              if (!['dirty', 'behind'].includes(state)) continue;
+
+              const { data: comments } = await github.rest.issues.listComments({
+                owner,
+                repo,
+                issue_number: pr.number,
+                per_page: 30
+              });
+
+              const dayMs = 24 * 60 * 60 * 1000;
+              const now = Date.now();
+              const recentRebaseComment = comments.some(c => {
+                if (c.user?.login !== 'github-actions[bot]') return false;
+                if (!c.body?.includes('@dependabot rebase')) return false;
+                return (now - new Date(c.created_at).getTime()) < dayMs;
+              });
+
+              if (recentRebaseComment) continue;
+
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: pr.number,
+                body: '@dependabot rebase'
+              });
+
+              core.info(`Requested rebase for #${pr.number} (${state})`);
             }
