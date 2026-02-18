@@ -1,0 +1,24 @@
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local env/config
+.env
+.env.*
+!.env.example
+.envrc
+.direnv/
+
+# Local CI/test outputs
+/test-output/
+
+# Patch/rebase leftovers
+*.orig
+*.rej
