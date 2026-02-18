@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint Scripts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Lint shell scripts
+        run: |
+          echo "Running shellcheck on all scripts..."
+          find scripts -name "*.sh" -exec shellcheck -x {} \;
+          echo "All scripts passed shellcheck"
+
+      - name: Validate action.yml
+        run: |
+          echo "Validating action.yml syntax..."
+          python3 -c "import yaml; yaml.safe_load(open('action.yml'))"
+          echo "action.yml is valid"
+
+  test:
+    name: Test Action
+    runs-on: ubuntu-latest
+    needs: lint
+    if: ${{ secrets.ELEVENLABS_API_KEY != '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Test TTS operation
+        uses: ./
+        with:
+          operation: tts
+          api-key: ${{ secrets.ELEVENLABS_API_KEY }}
+          text: "Hello from the ElevenLabs CLI GitHub Action test!"
+          voice: Brian
+          output: test-output/hello.mp3
+          verbose: "true"
+
+      - name: Verify TTS output
+        run: |
+          if [[ -f "test-output/hello.mp3" ]]; then
+            echo "TTS output file created successfully"
+            ls -la test-output/
+          else
+            echo "TTS output file not found"
+            exit 1
+          fi
+
+      - name: Test Usage operation
+        uses: ./
+        with:
+          operation: usage
+          api-key: ${{ secrets.ELEVENLABS_API_KEY }}
+          usage-threshold: 90
+
+  test-dry:
+    name: Test (Dry Run)
+    runs-on: ubuntu-latest
+    needs: lint
+    if: ${{ secrets.ELEVENLABS_API_KEY == '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Skip integration tests
+        run: |
+          echo "::warning::ELEVENLABS_API_KEY secret not set - skipping integration tests"
+          echo "Integration tests require an ElevenLabs API key."
+          echo "To run full tests, add ELEVENLABS_API_KEY to your repository secrets."
+          echo "See: https://docs.github.com/en/actions/security-guides/encrypted-secrets"

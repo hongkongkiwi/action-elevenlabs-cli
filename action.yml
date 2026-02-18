@@ -1,0 +1,222 @@
+name: 'ElevenLabs CLI Action'
+author: 'hongkongkiwi'
+description: 'Use ElevenLabs AI audio capabilities in your GitHub workflows - TTS, STT, Knowledge Base, and more'
+branding:
+  icon: 'mic'
+  color: 'purple'
+
+inputs:
+  operation:
+    description: 'Operation to perform (tts, stt, knowledge, rag, usage)'
+    required: true
+  api-key:
+    description: 'ElevenLabs API key'
+    required: true
+  
+  # TTS options
+  text:
+    description: 'Text to convert to speech'
+    required: false
+  text-file:
+    description: 'File containing text to convert'
+    required: false
+  voice:
+    description: 'Voice name (e.g., Brian, Rachel) or voice ID'
+    required: false
+    default: 'Brian'
+  model:
+    description: 'TTS model (eleven_multilingual_v2, eleven_flash_v2_5, eleven_v3, etc.)'
+    required: false
+    default: 'eleven_multilingual_v2'
+  output-format:
+    description: 'Audio output format (mp3_44100_128, mp3_44100_192, wav_44100, opus_48000_128, etc.)'
+    required: false
+    default: 'mp3_44100_128'
+  stability:
+    description: 'Voice stability (0.0-1.0, higher = more consistent)'
+    required: false
+    default: '0.5'
+  similarity-boost:
+    description: 'Voice similarity boost (0.0-1.0, higher = more similar to original)'
+    required: false
+    default: '0.75'
+  style:
+    description: 'Voice style/exaggeration (0.0-1.0)'
+    required: false
+    default: '0'
+  speaker-boost:
+    description: 'Enhance speaker clarity'
+    required: false
+    default: 'true'
+  language:
+    description: 'Language code for multilingual models (e.g., en, es, fr)'
+    required: false
+  seed:
+    description: 'Seed for reproducible output'
+    required: false
+  
+  # STT options
+  audio-file:
+    description: 'Audio file to transcribe'
+    required: false
+  stt-model:
+    description: 'STT model (scribe_v1 or scribe_v1_base)'
+    required: false
+    default: 'scribe_v1'
+  diarize:
+    description: 'Enable speaker diarization (identify different speakers)'
+    required: false
+    default: 'false'
+  num-speakers:
+    description: 'Expected number of speakers (for diarization)'
+    required: false
+  timestamps:
+    description: 'Timestamps granularity (none, word, character)'
+    required: false
+    default: 'word'
+  tag-audio-events:
+    description: 'Tag audio events (applause, music, etc.)'
+    required: false
+    default: 'true'
+  stt-language:
+    description: 'Language code for transcription (auto-detected if not specified)'
+    required: false
+  
+  # Output options
+  output:
+    description: 'Output file path (auto-generated if not specified)'
+    required: false
+  stt-format:
+    description: 'STT output format (json, txt, srt, vtt)'
+    required: false
+    default: 'txt'
+  
+  # Knowledge/RAG options
+  knowledge-action:
+    description: 'Knowledge action (add-url, add-file, add-text, list, get, delete)'
+    required: false
+    default: 'add-file'
+  document-url:
+    description: 'URL to add to knowledge base (for add-url action)'
+    required: false
+  document-file:
+    description: 'File to add to knowledge base (for add-file action)'
+    required: false
+  document-text:
+    description: 'Text content to add (for add-text action)'
+    required: false
+  document-name:
+    description: 'Name for the document'
+    required: false
+  document-description:
+    description: 'Description for the document'
+    required: false
+  document-id:
+    description: 'Document ID (for get, delete actions)'
+    required: false
+  
+  # RAG options
+  rag-action:
+    description: 'RAG action (create, status, delete)'
+    required: false
+    default: 'status'
+  rag-document-ids:
+    description: 'Comma-separated document IDs for RAG index creation'
+    required: false
+  rag-index-id:
+    description: 'RAG index ID (for status, delete actions)'
+    required: false
+  
+  # Usage options
+  usage-threshold:
+    description: 'Warn if usage percentage exceeds this value (0-100)'
+    required: false
+    default: '80'
+  
+  # General options
+  timeout:
+    description: 'Operation timeout in seconds'
+    required: false
+    default: '300'
+  retry-count:
+    description: 'Number of retries on failure'
+    required: false
+    default: '3'
+  verbose:
+    description: 'Enable verbose output'
+    required: false
+    default: 'false'
+
+outputs:
+  output-file:
+    description: 'Path to generated output file'
+    value: ${{ steps.main.outputs.output-file }}
+  transcript:
+    description: 'Transcription text (for STT operations)'
+    value: ${{ steps.main.outputs.transcript }}
+  usage-info:
+    description: 'Usage statistics as JSON (for usage operation)'
+    value: ${{ steps.main.outputs.usage-info }}
+  document-id:
+    description: 'Created document ID (for knowledge operations)'
+    value: ${{ steps.main.outputs.document-id }}
+  rag-index-id:
+    description: 'RAG index ID (for RAG create operation)'
+    value: ${{ steps.main.outputs.rag-index-id }}
+  voice-id:
+    description: 'Resolved voice ID (for TTS operations)'
+    value: ${{ steps.main.outputs.voice-id }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install ElevenLabs CLI
+      shell: bash
+      run: ${{ github.action_path }}/scripts/install-cli.sh
+      env:
+        RUNNER_OS: ${{ runner.os }}
+        RUNNER_ARCH: ${{ runner.arch }}
+        GITHUB_ACTION_REF: ${{ github.action_ref }}
+        INPUT_VERBOSE: ${{ inputs.verbose }}
+    
+    - name: Execute operation
+      id: main
+      shell: bash
+      run: ${{ github.action_path }}/scripts/execute.sh
+      env:
+        INPUT_OPERATION: ${{ inputs.operation }}
+        INPUT_API_KEY: ${{ inputs.api-key }}
+        INPUT_TEXT: ${{ inputs.text }}
+        INPUT_TEXT_FILE: ${{ inputs.text-file }}
+        INPUT_VOICE: ${{ inputs.voice }}
+        INPUT_MODEL: ${{ inputs.model }}
+        INPUT_OUTPUT_FORMAT: ${{ inputs.output-format }}
+        INPUT_STABILITY: ${{ inputs.stability }}
+        INPUT_SIMILARITY_BOOST: ${{ inputs.similarity-boost }}
+        INPUT_STYLE: ${{ inputs.style }}
+        INPUT_SPEAKER_BOOST: ${{ inputs.speaker-boost }}
+        INPUT_LANGUAGE: ${{ inputs.language }}
+        INPUT_SEED: ${{ inputs.seed }}
+        INPUT_AUDIO_FILE: ${{ inputs.audio-file }}
+        INPUT_STT_MODEL: ${{ inputs.stt-model }}
+        INPUT_DIARIZE: ${{ inputs.diarize }}
+        INPUT_NUM_SPEAKERS: ${{ inputs.num-speakers }}
+        INPUT_TIMESTAMPS: ${{ inputs.timestamps }}
+        INPUT_TAG_AUDIO_EVENTS: ${{ inputs.tag-audio-events }}
+        INPUT_STT_LANGUAGE: ${{ inputs.stt-language }}
+        INPUT_OUTPUT: ${{ inputs.output }}
+        INPUT_STT_FORMAT: ${{ inputs.stt-format }}
+        INPUT_KNOWLEDGE_ACTION: ${{ inputs.knowledge-action }}
+        INPUT_DOCUMENT_URL: ${{ inputs.document-url }}
+        INPUT_DOCUMENT_FILE: ${{ inputs.document-file }}
+        INPUT_DOCUMENT_TEXT: ${{ inputs.document-text }}
+        INPUT_DOCUMENT_NAME: ${{ inputs.document-name }}
+        INPUT_DOCUMENT_DESCRIPTION: ${{ inputs.document-description }}
+        INPUT_DOCUMENT_ID: ${{ inputs.document-id }}
+        INPUT_RAG_ACTION: ${{ inputs.rag-action }}
+        INPUT_RAG_DOCUMENT_IDS: ${{ inputs.rag-document-ids }}
+        INPUT_RAG_INDEX_ID: ${{ inputs.rag-index-id }}
+        INPUT_USAGE_THRESHOLD: ${{ inputs.usage-threshold }}
+        INPUT_TIMEOUT: ${{ inputs.timeout }}
+        INPUT_RETRY_COUNT: ${{ inputs.retry-count }}
+        INPUT_VERBOSE: ${{ inputs.verbose }}

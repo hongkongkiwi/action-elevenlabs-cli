@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Version: ${VERSION}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: ElevenLabs CLI Action ${{ steps.version.outputs.version }}
+          body: |
+            ## ElevenLabs CLI Action ${{ steps.version.outputs.version }}
+            
+            This release updates the GitHub Action to use ElevenLabs CLI ${{ steps.version.outputs.version }}.
+            
+            ### Usage
+            
+            ```yaml
+            - uses: hongkongkiwi/action-elevenlabs-cli@${{ steps.version.outputs.version }}
+              with:
+                operation: tts
+                api-key: $\{{ secrets.ELEVENLABS_API_KEY }}
+                text: "Hello, world!"
+                voice: Brian
+            ```
+            
+            See the [README](https://github.com/hongkongkiwi/action-elevenlabs-cli#readme) for full documentation.
+            
+            ### CLI Changelog
+            
+            See [ElevenLabs CLI Releases](https://github.com/hongkongkiwi/elevenlabs-cli/releases/tag/${{ steps.version.outputs.version }}) for CLI changes.
+          draft: false
+          prerelease: false
